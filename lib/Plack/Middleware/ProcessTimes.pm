@@ -31,19 +31,16 @@ sub call {
 
     @times = map { sprintf "%.3f", $_ } @times;
 
-    push @{$inner->[1]},
-      x_time_real      => $times[0],
-      x_time_cpu_user  => $times[1],
-      x_time_cpu_sys   => $times[2];
+    $env->{'pt.real'}     = $times[0];
+    $env->{'pt.cpu-user'} = $times[1];
+    $env->{'pt.cpu-sys'}  = $times[2];
 
     if ($self->measure_children) {
-      push @{$inner->[1]},
-        x_time_cpu_cuser => $times[3],
-        x_time_cpu_csys  => $times[4];
+      $env->{'pt.cpu-cuser'} = $times[3];
+      $env->{'pt.cpu-csys'}  = $times[4];
     } else {
-      push @{$inner->[1]},
-        x_time_cpu_cuser => '-',
-        x_time_cpu_csys  => '-';
+      $env->{'pt.cpu-cuser'} = '-';
+      $env->{'pt.cpu-csys'}  = '-';
     };
 
     return;
@@ -62,8 +59,11 @@ __END__
  use Plack::Builder;
 
  builder {
-    enable 'AccessLog::Timed',
-       format => '%r %t [%{x-time-real}o %{x-time-cpu-user}o %{x-time-cpu-sys}o]';
+    enable 'AccessLog::Structured',
+       extra_field => {
+         'pt.cpu-user' => 'CPU-User-Time',
+         'pt.cpu-sys'  => 'CPU-Sys-Time',
+       };
 
     enable 'ProcessTimes';
 
@@ -72,20 +72,20 @@ __END__
 
 =head1 DESCRIPTION
 
-C<Plack::Middleware::ProcessTimes> defines some response headers based on the
-L<perlfunc/times> function.  The following times are defined:
+C<Plack::Middleware::ProcessTimes> defines some environment values based on the
+L<perlfunc/times> function.  The following values are defined:
 
 =over
 
-=item * C<X-Time-Real> - Actual recorded wallclock time
+=item * C<pt.real> - Actual recorded wallclock time
 
-=item * C<X-Time-CPU-User>
+=item * C<pt.cpu-user>
 
-=item * C<X-Time-CPU-Sys>
+=item * C<pt.cpu-sys>
 
-=item * C<X-Time-CPU-CUser>
+=item * C<pt.cpu-cuser>
 
-=item * C<X-Time-CPU-CSys>
+=item * C<pt.cpu-csys>
 
 =back
 

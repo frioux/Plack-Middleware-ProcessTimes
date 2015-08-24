@@ -10,9 +10,11 @@ use Time::HiRes qw(gettimeofday tv_interval sleep);
 use HTTP::Request::Common;
 
 my $num = qr/^\d+\.\d{3}$/;
+my $last_env;
 
 subtest no_measure_children => sub {
    my $app = builder {
+      enable '+A::TestMW';
       enable 'ProcessTimes';
 
       sub { [200, [content_type => 'text/plain'], ['hello!']] };
@@ -23,16 +25,18 @@ subtest no_measure_children => sub {
 
       my $res = $cb->(GET '/');
 
-      like($res->header('X-Time-Real'),     $num, 'Real measured');
-      like($res->header('X-Time-CPU-User'), $num, 'CPU-User measured');
-      like($res->header('X-Time-CPU-Sys'),  $num, 'CPU-Sys measured');
-      is($res->header('X-Time-CPU-CUser'),  '-',  'CPU-CUser not measured');
-      is($res->header('X-Time-CPU-CSys'),   '-',  'CPU-CSys not measured');
+      my $e = $A::TestMW::ENV;
+      like($e->{'pt.real'},     $num, 'Real measured');
+      like($e->{'pt.cpu-user'}, $num, 'CPU-User measured');
+      like($e->{'pt.cpu-sys'},  $num, 'CPU-Sys measured');
+      is(  $e->{'pt.cpu-cuser'},'-',  'CPU-CUser not measured');
+      is(  $e->{'pt.cpu-csys'}, '-',  'CPU-CSys not measured');
    };
 };
 
 subtest measure_children => sub {
    my $app = builder {
+      enable '+A::TestMW';
       enable 'ProcessTimes', measure_children => 1;
 
       sub { [200, [content_type => 'text/plain'], ['hello!']] };
@@ -43,17 +47,19 @@ subtest measure_children => sub {
 
       my $res = $cb->(GET '/');
 
-      like($res->header('X-Time-Real'),      $num, 'Real measured');
-      like($res->header('X-Time-CPU-User'),  $num, 'CPU-User measured');
-      like($res->header('X-Time-CPU-Sys'),   $num, 'CPU-Sys measured');
-      like($res->header('X-Time-CPU-CUser'), $num, 'CPU-CUser measured');
-      like($res->header('X-Time-CPU-CSys'),  $num, 'CPU-CSys measured');
+      my $e = $A::TestMW::ENV;
+      like($e->{'pt.real'},      $num, 'Real measured');
+      like($e->{'pt.cpu-user'},  $num, 'CPU-User measured');
+      like($e->{'pt.cpu-sys'},   $num, 'CPU-Sys measured');
+      like($e->{'pt.cpu-cuser'}, $num, 'CPU-CUser measured');
+      like($e->{'pt.cpu-csys'},  $num, 'CPU-CSys measured');
    };
 };
 
 my $parent = $$;
 subtest 'actual numbers' => sub {
    my $app = builder {
+      enable '+A::TestMW';
       enable 'ProcessTimes', measure_children => 1;
 
       sub {
@@ -82,12 +88,31 @@ subtest 'actual numbers' => sub {
 
       note( $res->headers->as_string);
 
-      like($res->header('X-Time-Real'),      $num, 'Real measured');
-      like($res->header('X-Time-CPU-User'),  $num, 'CPU-User measured');
-      like($res->header('X-Time-CPU-Sys'),   $num, 'CPU-Sys measured');
-      like($res->header('X-Time-CPU-CUser'), $num, 'CPU-CUser measured');
-      like($res->header('X-Time-CPU-CSys'),  $num,  'CPU-CSys measured');
+      my $e = $A::TestMW::ENV;
+      like($e->{'pt.real'},      $num, 'Real measured');
+      like($e->{'pt.cpu-user'},  $num, 'CPU-User measured');
+      like($e->{'pt.cpu-sys'},   $num, 'CPU-Sys measured');
+      like($e->{'pt.cpu-cuser'}, $num, 'CPU-CUser measured');
+      like($e->{'pt.cpu-csys'},  $num,  'CPU-CSys measured');
    };
 } if $ENV{AUTHOR_TESTING};
 
 done_testing;
+
+BEGIN {
+package A::TestMW;
+
+$INC{'A/TestMW.pm'} = __FILE__;
+
+use base 'Plack::Middleware';
+
+our $ENV;
+
+sub call {
+   my ($self, $env) = @_;
+
+   $ENV = $env;
+
+   $self->app->( $env );
+}
+}
