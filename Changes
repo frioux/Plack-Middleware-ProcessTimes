@@ -1,6 +1,8 @@
 Revision history for {{$dist->name}}
 
 {{$NEXT}}
+
+1.001000  2016-10-04 12:47:09-07:00 America/Los_Angeles
  - Use getrusage(2) instead of times(2) for finer grained measurements.
    (Fixes GH#2)
 
