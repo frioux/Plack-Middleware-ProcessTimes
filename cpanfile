@@ -1,4 +1,5 @@
 requires 'Time::HiRes';
+requires 'Unix::Getrusage';
 requires 'Plack' => 1.0037;
 
 on test => sub {

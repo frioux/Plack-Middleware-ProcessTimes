@@ -5,14 +5,19 @@ use warnings;
 
 # ABSTRACT: Include process times of a request in the Plack env
 
-use Time::HiRes qw(time);
+use Time::HiRes qw(gettimeofday tv_interval);
 use parent 'Plack::Middleware';
 use Plack::Util::Accessor qw( measure_children );
+use Unix::Getrusage;
 
 sub call {
   my ($self, $env) = @_;
 
-  my @times = (time, times);
+  my $t0 = [gettimeofday()];
+  my $rusage0 = getrusage();
+  my $rusagec0;
+  $rusagec0 = getrusage_children()
+    if $self->measure_children;
 
   my $res = $self->app->($env);
 
@@ -23,21 +28,16 @@ sub call {
        1 while waitpid(-1, 1) > 0;
     }
 
-    @times = map { $_ - shift @times } time, times;
+    my $new_rusage = getrusage();
 
-    my $CPU = 0;
-    $CPU += $times[$_] for 1..4;
-    push @times, $CPU;
-
-    @times = map { sprintf "%.3f", $_ } @times;
-
-    $env->{'pt.real'}     = $times[0];
-    $env->{'pt.cpu-user'} = $times[1];
-    $env->{'pt.cpu-sys'}  = $times[2];
+    $env->{'pt.real'}     = tv_interval($t0);
+    $env->{'pt.cpu-user'} = $new_rusage->{ru_utime} - $rusage0->{ru_utime};
+    $env->{'pt.cpu-sys'}  = $new_rusage->{ru_stime} - $rusage0->{ru_stime};
 
     if ($self->measure_children) {
-      $env->{'pt.cpu-cuser'} = $times[3];
-      $env->{'pt.cpu-csys'}  = $times[4];
+      my $new_rusagec = getrusage_children();
+      $env->{'pt.cpu-cuser'} = $new_rusagec->{ru_utime} - $rusagec0->{ru_utime};
+      $env->{'pt.cpu-csys'}  = $new_rusagec->{ru_stime} - $rusagec0->{ru_stime};
     } else {
       $env->{'pt.cpu-cuser'} = '-';
       $env->{'pt.cpu-csys'}  = '-';
@@ -73,7 +73,7 @@ __END__
 =head1 DESCRIPTION
 
 C<Plack::Middleware::ProcessTimes> defines some environment values based on the
-L<perlfunc/times> function.  The following values are defined:
+C<getrusage(2)> system call.  The following values are defined:
 
 =over
 
@@ -89,7 +89,8 @@ L<perlfunc/times> function.  The following values are defined:
 
 =back
 
-Look up C<times(2)> in your system manual for what these all mean.
+The above are meant to be a C<perlfunc/times> like interface using C<getrusage>
+for more accuracy.
 
 =head1 CONFIGURATION
 

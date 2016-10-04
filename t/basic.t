@@ -5,12 +5,19 @@ use warnings;
 
 use Plack::Test;
 use Plack::Builder;
+use Scalar::Util 'looks_like_number';
 use Test::More;
 use Time::HiRes qw(gettimeofday tv_interval sleep);
 use HTTP::Request::Common;
 
-my $num = qr/^\d+\.\d{3}$/;
 my $last_env;
+
+sub _num {
+   my ($val, $message) = @_;
+
+   ok(looks_like_number($val), $message)
+      or diag "Expected number, got $val";
+}
 
 subtest no_measure_children => sub {
    my $app = builder {
@@ -26,9 +33,9 @@ subtest no_measure_children => sub {
       my $res = $cb->(GET '/');
 
       my $e = $A::TestMW::ENV;
-      like($e->{'pt.real'},     $num, 'Real measured');
-      like($e->{'pt.cpu-user'}, $num, 'CPU-User measured');
-      like($e->{'pt.cpu-sys'},  $num, 'CPU-Sys measured');
+      _num($e->{'pt.real'},     'Real measured');
+      _num($e->{'pt.cpu-user'}, 'CPU-User measured');
+      _num($e->{'pt.cpu-sys'},  'CPU-Sys measured');
       is(  $e->{'pt.cpu-cuser'},'-',  'CPU-CUser not measured');
       is(  $e->{'pt.cpu-csys'}, '-',  'CPU-CSys not measured');
    };
@@ -48,11 +55,11 @@ subtest measure_children => sub {
       my $res = $cb->(GET '/');
 
       my $e = $A::TestMW::ENV;
-      like($e->{'pt.real'},      $num, 'Real measured');
-      like($e->{'pt.cpu-user'},  $num, 'CPU-User measured');
-      like($e->{'pt.cpu-sys'},   $num, 'CPU-Sys measured');
-      like($e->{'pt.cpu-cuser'}, $num, 'CPU-CUser measured');
-      like($e->{'pt.cpu-csys'},  $num, 'CPU-CSys measured');
+      _num($e->{'pt.real'},      'Real measured');
+      _num($e->{'pt.cpu-user'},  'CPU-User measured');
+      _num($e->{'pt.cpu-sys'},   'CPU-Sys measured');
+      _num($e->{'pt.cpu-cuser'}, 'CPU-CUser measured');
+      _num($e->{'pt.cpu-csys'},  'CPU-CSys measured');
    };
 };
 
@@ -89,11 +96,11 @@ subtest 'actual numbers' => sub {
       note( $res->headers->as_string);
 
       my $e = $A::TestMW::ENV;
-      like($e->{'pt.real'},      $num, 'Real measured');
-      like($e->{'pt.cpu-user'},  $num, 'CPU-User measured');
-      like($e->{'pt.cpu-sys'},   $num, 'CPU-Sys measured');
-      like($e->{'pt.cpu-cuser'}, $num, 'CPU-CUser measured');
-      like($e->{'pt.cpu-csys'},  $num,  'CPU-CSys measured');
+      _num($e->{'pt.real'},      'Real measured');
+      _num($e->{'pt.cpu-user'},  'CPU-User measured');
+      _num($e->{'pt.cpu-sys'},   'CPU-Sys measured');
+      _num($e->{'pt.cpu-cuser'}, 'CPU-CUser measured');
+      _num($e->{'pt.cpu-csys'},  'CPU-CSys measured');
    };
 } if $ENV{AUTHOR_TESTING};
 
